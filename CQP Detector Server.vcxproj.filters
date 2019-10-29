@@ -1,0 +1,52 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Source Files\mini_parser">
+      <UniqueIdentifier>{816b074f-711b-42fc-b6da-370b8d7c6287}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\websocket_relay">
+      <UniqueIdentifier>{1c866ebd-3065-404e-9e62-92e41d223e43}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\mini_parser.cpp">
+      <Filter>Source Files\mini_parser</Filter>
+    </ClCompile>
+    <ClCompile Include="..\cqp_detectotron.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\websocket_relay\base64.cpp">
+      <Filter>Source Files\websocket_relay</Filter>
+    </ClCompile>
+    <ClCompile Include="..\websocket_relay\sha1.cpp">
+      <Filter>Source Files\websocket_relay</Filter>
+    </ClCompile>
+    <ClCompile Include="..\websocket_relay\websocket_relay.cpp">
+      <Filter>Source Files\websocket_relay</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\mini_parser.h">
+      <Filter>Source Files\mini_parser</Filter>
+    </ClInclude>
+    <ClInclude Include="..\cqp_detectotron.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\websocket_relay\base64.h">
+      <Filter>Source Files\websocket_relay</Filter>
+    </ClInclude>
+    <ClInclude Include="..\websocket_relay\websocket_relay.h">
+      <Filter>Source Files\websocket_relay</Filter>
+    </ClInclude>
+    <ClInclude Include="..\websocket_relay\sha1.h">
+      <Filter>Source Files\mini_parser</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Library Include="..\UQDevices\CTimeTag\Win64\CTimeTagLibDebug.lib" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,1841 @@
+<html>
+<head>
+<title>Detector Server</title>
+
+  <!-- force browser re-load, so people don't have stale copies of this page -->
+  <meta http-equiv="cache-control" content="no-cache, must-revalidate, post-check=0, pre-check=0">
+  <meta http-equiv="expires" content="Sat, 31 Oct 2014 00:00:00 GMT">
+  <meta http-equiv="pragma" content="no-cache">
+
+  <script type="text/javascript" src="http://code.jquery.com/jquery-1.11.1.min.js"></script>
+</head>
+<body>
+<font face="Tahoma, Digital, Arial, Helvetica, sans-serif" size="3">
+<img src="images/logo_top.png" height="100"/>
+<br/>
+
+<h2>Detect-o-tron</h2>
+version 0.3b (under construction)
+
+<div id="hardhat_div">
+<table>
+<!--
+<tr>
+<td>
+<img src="images/hardhat.png" width="80" />
+</td>
+<td>
+<br/>
+<b>This page is under construction. If the server is not connecting, try the admin page <a href="detector_admin.php" target="__blank">here</a>.</b>
+
+</td>
+</tr>
+-->
+<tr>
+<td valign="top">
+<img src="images/book.png" width="40" onclick="toggle_div('documentation_div');" title="Click this to display available documentation."/>
+</td>
+<td>
+<div id="documentation_div" style="display:none;">
+<ul>
+<li><a href="doc/waterloo_timetag_manual_11_9.pdf" target="__blank"><b>Waterloo Timetag User Manual</b></a></li>
+<li><a href="doc/waterloo_logic_manual_5_2.pdf" target="__blank"><b>Waterloo Logic User Manual</b></a></li>
+<li><a href="doc/detector_docs.html" target="__blank"><b>Detector Server Data Format</b></a></li>
+<li><a href="samples/detector_sample_python.py" target="__blank"><b>Python Sample</b></a></li>
+<li><a href="samples/detector_sample_matlab.m" target="__blank"><b>Matlab Sample</b></a></li>
+</ul>
+</div>
+</td>
+<td valign="top">
+<img src="images/wrench.png" width="40"  onclick="toggle_div('admin_div');" title="Click this to show Admin console." />
+</td>
+<td>
+<div id="admin_div" style="display:none;">
+<iframe src="detector_admin.php" width="800"></iframe>
+</div>
+</td>
+</tr>
+</table>
+</div>
+
+<br/>
+<input type="text" id="user_name_input" style="width:140px;" placeholder="(user name)" onchange="send_channel_settings();">
+server:
+<input type="text" disabled="" id="server_address_input" style="width:140px;" placeholder="(server address)" onchange="server_box_changed();">
+<img id="server_address_lock" src="images/locked.png" height="20" onclick="toggle_server_box_lock();"/>
+<br/>
+
+<table>
+    <tr>
+        <td valign="top">
+            <button onclick="connect_websocket();">Connect</button>
+            <button onclick="disconnect_websocket();">Disonnect</button>
+            <span id="connection_status_span">
+                <font color="#a00" size="1">NOT CONNECTED TO RELAY</font>
+            </span>
+            <br/>
+            <input type="radio" id="cva_abs" name="cps_vs_absolute" value="absolute">
+            <label for="cva_abs">Display absolute counts</label><br/>
+            <input type="radio" id="cva_cps" name="cps_vs_absolute" value="cps" checked="">
+            <label for="cva_cps" title="delta_time is the difference between the polling times. This can introduce noise when the poll times are very quick.">
+            Display counts per second <i>(delta_time)</i></label><br/>
+            <input type="radio" id="cva_span_time" name="cps_vs_absolute" value="span_time">
+            <label for="cva_span_time" title="span_time is the difference between the first and last actual timetag in each group. This is useful when the number of counts is very high.">
+            Display counts per second <i>(span_time)</i></label><br/>
+            <br/>
+            <font size="2"><a title="When the poll time is 1-per-second or longer, logs of all data are kept for 7 days." href="cqp_logs" target="__blank">View detector log files</a></font>
+        </td>
+        <td valign="top" style="border-left-style:solid;border-left-width:0.5;border-left-color:#eee;">
+            Get counts...<br/>
+            <input type="radio" id="poll_1ps" onclick="send_channel_settings();" name="poll_time_radio" value="poll_1ps" checked="">
+            <label for="poll_1ps">...once per second</label><br/>
+            <input type="radio" id="poll_10ps" onclick="send_channel_settings();" name="poll_time_radio" value="poll_10ps">
+            <label for="poll_10ps">...10 times per second</label><br/>
+            <input type="radio" id="poll_xps" onclick="send_channel_settings();" name="poll_time_radio" value="poll_xps">
+            <label for="poll_xps">...every
+            <input type="number" id="input_poll_xps" onchange="send_channel_settings();" style="width:50px;" min="0.1" max="10000" value="10" step="0.1">
+            seconds</label><br/>
+            <input type="radio" id="poll_xpm" onclick="send_channel_settings();" name="poll_time_radio" value="poll_xpm">
+            <label for="poll_xpm">...every
+            <input type="number" id="input_poll_xpm" onchange="send_channel_settings();" style="width:50px;" min="0.1" max="10000" value="10" step="0.1">
+            minutes</label><br/>
+            <input type="radio" id="poll_manual" onclick="send_channel_settings();" name="poll_time_radio" value="poll_manual">
+            <label for="poll_manual">...manually</label>
+            <button onclick="poll_for_counts();">Get counts now</button>
+            <br/>
+        </td>
+        <td valign="top" style="border-left-style:solid;border-left-width:0.5;border-left-color:#eee;">
+            <span id="uptime_status_span"></span>
+        </td>
+    </tr>
+</table>
+<!--
+<br/>
+<button onclick="switch_waterloo_mode('timetag');">Set Data Mode to Timetag</button>
+<button onclick="switch_waterloo_mode('logic');">Set Data Mode to Logic</button>
+<br/>
+-->
+
+<!--
+<br/>
+<button onclick="if (websocket) websocket.send('hello');">Ping</button>
+<br/>
+<input type="checkbox" id="fake_data_check" onclick="click_fake_data_button();">Generate fake data</button>
+-->
+    
+
+<span id="error_text_span"></span>
+<span id="channel_button_span"></span>
+<br/>
+<table>
+    <tr>
+        <td valign="top">
+            <div id="popout_count" overflow="auto">
+                <span id="popout_count_header"></span>
+<!--                <div id="div_count" overflow="auto"> -->
+                    <canvas id="popout_count_canvas" width="400" height="200" style="border: 3px inset rgba(128,128,128,0.2);"></canvas>
+                    <br/>
+                    <button onclick="recording_clear();" title="Clear the count history data.">Clear</button>
+                    <button onclick="recording_copy_to_clipboard();" title="Copy count history data, so that you can paste it into any spreadsheet.">Copy Data to Clipbard</button>
+                    <button onclick="recording_save_csv();" title="Save count history data as a CSV.">Save Data as CSV</button>
+                    <br/>
+                    <b>History length:</b> <input type="number" id="recording_length_input" onchange="recording_length_changed();" style="width:50px;" min="10" max="1000000" value="1000" step="1000"> samples
+                    <br/>
+                    <b>Current data:</b> <span id="recording_length_actual_span">0 samples</span>
+<!--                </div> -->
+                <span id="popout_count_footer"></span>
+            </div>
+        </td>
+        <td valign="top">
+            <div id="popout_histogram" overflow="scroll">
+                <span id="popout_histogram_header"></span>
+                <div id="div_histogram" overflow="scroll">
+                    <canvas id="popout_histogram_canvas" width="400" height="200" style="border: 3px inset rgba(128,128,128,0.2);"></canvas>
+                    <br/>
+                    <button onclick="clear_histogram();" title="Clear the histogram data.">Clear</button>
+                    <button onclick="copy_histogram();" title="Copy complete histogram data, so that you can paste it into any spreadsheet.">Copy Data to Clipbard</button>
+                    <textarea id="hidden_clipboard_transfer" style="display:block;"></textarea>
+                </div>
+                <span id="popout_histogram_footer"></span>
+            </div>
+        </td>
+        <td valign="top">
+            <div id="popout_coincidence" style="display:none;" overflow="scroll">
+                <span id="popout_coincidence_header"></span>
+                <div id="div_coincidence" overflow="scroll">
+                    <canvas id="coincidence_canvas" width="400" height="200" style="border: 3px inset rgba(128,128,128,0.2);"></canvas>
+                    <br/>
+                    <button onclick="recording_clear();" title="Clear the coincidence history data.">Clear</button>
+                    <button onclick="recording_copy_to_clipboard();" title="Copy coincidence history data, so that you can paste it into any spreadsheet.">Copy Data to Clipbard</button>
+                    <button onclick="recording_save_csv();" title="Save coincidence history data as a CSV.">Save Data as CSV</button>
+                </div>
+                <span id="popout_coincidence_footer"></span>
+            </div>
+        </td>
+    </tr>
+</table>
+<br/>
+<textarea id="output_textarea" rows="20" cols="80">
+    
+</textarea>
+    <script type="text/javascript">
+
+var host_addr = ''; // This is set in server_box_changed();
+var host_port = ''; // This is set in server_box_changed();
+//var host_addr = '10.70.19.32';
+var websocket = null;
+//var counts_text_span = document.getElementById('counts_text_span');
+var active_channels = [];
+var num_channels = 16;
+for (var i = 0; i < num_channels; ++i)
+{
+    active_channels[i] = false;
+}
+var error_text_span = document.getElementById('error_text_span');
+var uptime_status_span  = document.getElementById("uptime_status_span");
+
+var current_setup = null;
+var need_first_setup = true;
+var coincidence_rows = 8;
+var histogram_rows = 1;
+
+var channel_enable_buttons = [];
+
+function toggle_div(div_name)
+{
+  var div = document.getElementById(div_name);
+  if (div)
+  {
+    if (div.style.display == 'none')
+      div.style.display = 'block';
+    else
+    {
+      div.style.display = 'none';
+    }
+  }
+}
+
+function create_channel_area()
+{
+    var span = document.getElementById("channel_button_span");
+    if (!span)
+        return;
+
+    var span_str = '';
+    span_str += '<table>';
+
+    // The users on each channel
+    span_str += '<tr>';
+    // use clar.png to provide space so these ton't jump up and down as names are added.
+    span_str += '<td><img src="images/clear.png" width="10" height="70"/></td>';
+    for (var chan = 0; chan < num_channels; ++chan)
+    {
+        span_str += '<td valign="bottom" align="center">';
+        span_str += '<span id="users_on_channel' + chan + '"></span>';
+        span_str += '</td>';
+    }
+    span_str += '</tr>';
+
+    // The channel activation buttons
+    span_str += '<tr>';
+    span_str += '<td></td>';
+    for (var chan = 0; chan < num_channels; ++chan)
+    {
+        span_str += '<td valign="top" align="center">';
+        span_str += '<button style="width:80px;" onclick="click_channel_button(' + chan + ');">' + (chan + 1) + '</button>';
+        span_str += '</td>';
+    }
+    span_str += '</tr>';
+
+    // The filter buttons
+    span_str += '<tr>';
+    span_str += '<td></td>';
+    for (var chan = 0; chan < num_channels; ++chan)
+    {
+        span_str += '<td valign="top" align="center">';
+        span_str += '<input type="button" id="filter_button_'+chan+'" value="FILTERED" style="width:80px;height:15px;font-size:0.5em;background-color:#efe;" onclick="click_filter_button(' + chan + ');"/>';
+        span_str += '</td>';
+    }
+    span_str += '</tr>';
+
+    // The edge_inversion buttons
+    span_str += '<tr>';
+    span_str += '<td></td>';
+    for (var chan = 0; chan < num_channels; ++chan)
+    {
+        span_str += '<td valign="top" align="center">';
+        span_str += '<input type="button" id="edge_inversion_button_'+chan+'" value="RISING EDGE" style="width:80px;height:15px;font-size:0.5em;background-color:#efe;" onclick="click_edge_inversion_button(' + chan + ');"/>';
+        span_str += '</td>';
+    }
+    span_str += '</tr>';
+
+    // The counts
+    span_str += '<tr>';
+    span_str += '<td></td>';
+    for (var chan = 0; chan < num_channels; ++chan)
+    {
+        span_str += '<td valign="top" align="center">';
+        span_str += '<span id="counts_text_span' + chan + '">-</span>';
+        span_str += '</td>';
+    }
+    span_str += '<td valign="top" align="center">';
+    span_str += '<span id="counts_text_span_total">-</span>';
+    span_str += '</td>';
+    span_str += '</tr>';
+
+    // The channel voltage settings
+    span_str += '<tr>';
+    span_str += '<td valign="top" align="right"><font size="2" color="#000">input\xa0threshold:</font></td>';
+    for (var chan = 0; chan < num_channels; ++chan)
+    {
+        span_str += '<td valign="top" align="left">';
+        span_str += '<input type="number" id="input_threshold_input' + chan + '" onchange="send_channel_settings();" style="width:50px;" min="-2" max="2" value="2" step="0.01">';
+        span_str += '<font size="2" color="#aaa">v</font>';
+        span_str += '</td>';
+    }
+    span_str += '</tr>';
+
+    // The channel delay settings
+    span_str += '<tr>';
+    span_str += '<td valign="top" align="right"><font size="2" color="#000">delay:</font></td>';
+    for (var chan = 0; chan < num_channels; ++chan)
+    {
+        span_str += '<td valign="top" align="left">';
+        span_str += '<input type="number" disabled="" id="channel_delay_ns' + chan + '" onchange="send_channel_settings();" style="width:50px;" min="0" max="40800" value="0" step="0.15625">';
+        span_str += '<font size="2" color="#aaa">ns</font>';
+        span_str += '</td>';
+    }
+    span_str += '</tr>';
+
+
+    // Coincidence area
+    span_str += '<tr>';
+    span_str += '<td valign="top" align="right"><font size="2" color="#000">coincidence window:</font>';
+    span_str += '<br/><input type="number" id="coincidence_window_input" style="width:50px;" onchange="send_channel_settings();" min="0" max="40800" size="4" value="2" step="0.1">';
+    span_str += '<font size="2" color="#aaa">ns</font>';
+    span_str += '</td>';
+    span_str += '</tr>';
+
+    for (var co_row = 0; co_row < coincidence_rows; ++co_row)
+    {
+        span_str += '<tr>';
+        span_str += '<td valign="top" align="right">';
+        span_str += '<span id="coincidence_text_span' + co_row + '">-</span>';
+        span_str += '</td>';
+        for (var chan = 0; chan < num_channels; ++chan)
+        {
+            span_str += '<td valign="top" align="center" style="border-top-style:solid;border-top-width:0.5;border-top-color:#eee;">';
+            span_str += '<input type="checkbox" id="channel_coincidence' + co_row + '_' + chan + '" onchange="send_channel_settings();">';
+            span_str += '</td>';
+        }
+        span_str += '<td valign="top" align="left">';
+        span_str += '</td>';
+        span_str += '<td valign="top" align="left">';
+        span_str += '</td>';
+        span_str += '</tr>';
+    }
+    span_str += '<tr>';
+    span_str += '<td valign="top" align="right">';
+    span_str += '<span id="coincidence_text_span_total">-</span>';
+    span_str += '</td>';
+    span_str += '<tr>';
+
+
+    // Histogram area
+    span_str += '<tr>';
+    span_str += '<td valign="top" align="right"><font size="2" color="#000">histogram window:</font>';
+    span_str += '<br/><input type="number" id="histogram_window_input" style="width:50px;" onchange="send_channel_settings();" min="0" max="40800" size="4" value="50" step="0.1">';
+    span_str += '<font size="2" color="#aaa">ns</font>';
+    span_str += '</td>';
+    span_str += '</tr>';
+
+    for (var co_row = 0; co_row < histogram_rows; ++co_row)
+    {
+        span_str += '<tr>';
+        span_str += '<td valign="top" align="right">';
+        span_str += '<span id="histogram_text_span' + co_row + '">-</span>';
+        span_str += '</td>';
+        for (var chan = 0; chan < num_channels; ++chan)
+        {
+            span_str += '<td valign="top" align="center" style="border-top-style:solid;border-top-width:0.5;border-top-color:#eee;">';
+            span_str += '<input type="checkbox" id="channel_histogram' + co_row + '_' + chan + '" onchange="send_channel_settings();">';
+            span_str += '</td>';
+        }
+        span_str += '<td valign="top" align="left">';
+        span_str += '</td>';
+        span_str += '<td valign="top" align="left">';
+        span_str += '</td>';
+        span_str += '</tr>';
+    }
+
+
+
+    span_str += '</table>';
+    span.innerHTML = span_str;
+}
+
+function update_channel_area_from_current_setup()
+{
+    set_filter_buttons();
+    set_edge_inversion_buttons();
+    for (var chan = 0; chan < num_channels; ++chan)
+    {
+        var active = active_channels[chan];
+        var item_filter = document.getElementById('filter_button_' + chan);
+        var item_edge_inversion = document.getElementById('edge_inversion_button_' + chan);
+        var item_volts = document.getElementById('input_threshold_input' + chan);
+        var item_delay = document.getElementById('channel_delay_ns' + chan);
+        if (active)
+        {
+            item_volts.disabled = false;
+            item_delay.disabled = false;
+            item_filter.disabled = false;
+            item_edge_inversion.disabled = false;
+            for (var co_row = 0; co_row < coincidence_rows; ++co_row)
+            {
+                var item_check = document.getElementById('channel_coincidence' + co_row + '_' + chan);
+                item_check.style.visibility = '';
+            }
+            for (var co_row = 0; co_row < histogram_rows; ++co_row)
+            {
+                var item_check = document.getElementById('channel_histogram' + co_row + '_' + chan);
+                item_check.style.visibility = '';
+            }
+        }
+        else
+        {
+            item_volts.disabled = true;
+            item_delay.disabled = true;
+            item_filter.disabled = true;
+            item_edge_inversion.disabled = true;
+            for (var co_row = 0; co_row < coincidence_rows; ++co_row)
+            {
+                var item_check = document.getElementById('channel_coincidence' + co_row + '_' + chan);
+                item_check.style.visibility = 'hidden';
+            }
+            for (var co_row = 0; co_row < histogram_rows; ++co_row)
+            {
+                var item_check = document.getElementById('channel_histogram' + co_row + '_' + chan);
+                item_check.style.visibility = 'hidden';
+            }
+        }
+        if (current_setup.channel_delay_ns[chan] != null)
+        {
+            item_delay.value = current_setup.channel_delay_ns[chan];
+        }
+        if (current_setup.input_threshold_volts[chan] != null)
+            item_volts.value = current_setup.input_threshold_volts[chan];
+
+        var span_users = document.getElementById('users_on_channel' + chan);
+        var user_str = '<font size="1" color="%292">';
+        for (var i = 0; i < current_setup.connected_users.length; ++i)
+        {
+            if (current_setup.connected_active_channels[i] & (1 << chan))
+            {
+                user_str += current_setup.connected_users[i];
+                user_str += ' (' + current_setup.connected_platforms[i] + ')<br/>';
+            }
+        }
+        user_str += '</font>'
+        span_users.innerHTML = user_str;
+    }
+}
+
+function switch_waterloo_mode(new_mode)
+{
+    if (!current_setup)
+        return;
+    current_setup.waterloo_data_mode = new_mode;
+    send_channel_settings();
+}
+
+
+function connect_websocket()
+{
+    var user_name = get_user_name();
+    if (!user_name)
+    {
+        alert('Please enter your user name to connect.');
+        return;
+    }
+    var wsUri = 'ws://' + host_addr + ':' + host_port;
+    websocket = new WebSocket(wsUri);
+    websocket.onopen    = function(evt) { onOpen(evt) };
+    websocket.onclose   = function(evt) { onClose(evt) };
+    websocket.onmessage = function(evt) { onMessage(evt) };
+    websocket.onerror   = function(evt) { onError(evt) };
+    websocket.binaryType = "arraybuffer";
+}
+
+function disconnect_websocket()
+{
+    if (websocket)
+    {
+        websocket.send('disconnect');
+        onClose();
+        websocket.close();
+        websocket = null;
+    }
+}
+
+function onOpen(evt)
+{
+    // Indicate connected
+    document.getElementById('connection_status_span').innerHTML =
+        '<font color="#0a0" size="1">CONNECTED TO RELAY</font>';
+
+    need_first_setup = true;
+    if (websocket)
+        websocket.send('setup');
+
+    send_channel_settings();
+    recording_length_changed();
+}
+
+function onClose(evt)
+{
+    // Indicate disconnected
+    document.getElementById('connection_status_span').innerHTML =
+        '<font color="#a00" size="1">NOT CONNECTED TO RELAY</font>';
+    uptime_status_span.innerHTML = '';
+}
+
+function onMessage(evt)
+{
+    if (typeof evt.data == 'string')
+        handle_string(evt.data);
+    else
+        handle_binary(evt.data);
+}
+
+function onError(evt)
+{
+}
+
+var cookie_expire_days = 365;
+var current_detector_data = null;
+var frame_number = 0;
+
+function get_user_name()
+{
+    return document.getElementById("user_name_input").value;
+}
+
+function set_cookie(cname, cvalue)
+{
+    var d = new Date();
+    d.setTime(d.getTime() + (cookie_expire_days*24*60*60*1000));
+    var expires = "expires="+ d.toUTCString();
+    document.cookie = cname + "=" + cvalue + ";" + expires + ";path=/";
+}
+
+function get_cookie(cname)
+{
+    var name = cname + "=";
+    var ca = document.cookie.split(';');
+    for(var i = 0; i <ca.length; i++) {
+        var c = ca[i];
+        while (c.charAt(0)==' ') {
+            c = c.substring(1);
+        }
+        if (c.indexOf(name) == 0) {
+            return c.substring(name.length,c.length);
+        }
+    }
+    return "";
+}
+
+function read_cookie_data()
+{
+    var user_name = get_cookie('user_name');
+    document.getElementById("user_name_input").value = user_name;
+
+    host_addr = get_cookie('host_addr');
+    host_port = get_cookie('host_port');
+    server_box_changed();
+}
+read_cookie_data();
+
+function poll_for_counts()
+{
+    if (websocket)
+        websocket.send('counts');
+}
+
+function send_channel_settings()
+{
+    // Set the user name
+    var user_name = get_user_name();
+    // Setting the cookies here means they're only set if we seem to have a valid connection.
+    set_cookie('user_name', user_name);
+    set_cookie('host_addr', host_addr);
+    set_cookie('host_port', host_port);
+    if (user_name == '')
+        user_name = '(unknown user)';
+
+    if (!current_setup)
+        return;
+    if (!websocket)
+        return;
+
+    var coincidence_window = document.getElementById("coincidence_window_input").value;
+    coincidence_window = parseFloat(coincidence_window);
+    var histogram_window = document.getElementById("histogram_window_input").value;
+    histogram_window = parseFloat(histogram_window);
+
+
+    current_setup.poll_time = 1.0;
+    var poll_1ps    = document.getElementById("poll_1ps");
+    var poll_10ps   = document.getElementById("poll_10ps");
+    var poll_xps    = document.getElementById("poll_xps");
+    var poll_xpm    = document.getElementById("poll_xpm");
+    var poll_manual = document.getElementById("poll_manual");
+    if (poll_1ps.checked)
+        current_setup.poll_time = 1.0;
+    else if (poll_10ps.checked)
+        current_setup.poll_time = 0.1;
+    else if (poll_xps.checked)
+        current_setup.poll_time = parseFloat(document.getElementById("input_poll_xps").value);
+    else if (poll_xpm.checked)
+        current_setup.poll_time = 60 * parseFloat(document.getElementById("input_poll_xpm").value);
+    else if (poll_manual.checked)
+        current_setup.poll_time = 0;
+
+
+
+//    console.log(current_setup);
+    current_setup.active_channels = 0;
+    for (var i = 0; i < active_channels.length; ++i)
+    {
+        if (active_channels[i])
+            current_setup.active_channels |= 1 << i;
+
+        var input_threshold = document.getElementById("input_threshold_input" + i);
+        current_setup.input_threshold_volts[i] = parseFloat(input_threshold.value);
+
+        {
+            // Check to make sure the values are ok
+            var channel_delay = document.getElementById("channel_delay_ns" + i);
+            var value = parseFloat(channel_delay.value);
+            var max_value = 40800;
+            var min_value = 0;
+            if (value > max_value)
+                value = max_value;
+            // Convert to Waterloo units
+            // Round
+            // Convert back
+            if (value < min_value)
+                value = min_value;
+            current_setup.channel_delay_ns[i] = value;
+            channel_delay.value = value;
+        }
+    }
+
+    current_setup.coincidence_channels = [];
+    current_setup.coincidence_windows_ns = [];
+    for (var co = 0; co < coincidence_rows; ++co)
+    {
+        var co_chan_count = 0;
+        var co_chan_mask = 0;
+        for (var chan = 0; chan < num_channels; ++chan)
+        {
+            var checkbox = document.getElementById("channel_coincidence" + co + "_" + chan);
+            if (checkbox.checked)
+            {
+                co_chan_count++;
+                co_chan_mask |= 1 << chan;
+            }
+        }
+        if (co_chan_count > 0)
+        {
+            // Yes, ask for multi-channel coincidences
+            current_setup.coincidence_channels.push(co_chan_mask);
+            current_setup.coincidence_windows_ns.push(coincidence_window);
+        }
+    }
+
+    current_setup.histogram_channels = 0;
+    current_setup.histogram_windows_ns = 50;
+    for (var co = 0; co < histogram_rows; ++co)
+    {
+        var co_chan_count = 0;
+        var co_chan_mask = 0;
+        for (var chan = 0; chan < num_channels; ++chan)
+        {
+            var checkbox = document.getElementById("channel_histogram" + co + "_" + chan);
+            if (checkbox.checked)
+            {
+                co_chan_count++;
+                co_chan_mask |= 1 << chan;
+            }
+        }
+
+        current_setup.histogram_channels = co_chan_mask;
+        current_setup.histogram_windows_ns = histogram_window;
+    }
+
+    current_setup.user_name = user_name;
+    current_setup.user_platform = 'web';
+
+//    console.log(current_setup);
+    var message = JSON.stringify(current_setup);
+    console.log('sending:');
+    console.log(message);
+    websocket.send(message);
+/*
+    // Send the active channels info
+    var active_channel_bits = 0;
+    for (var i = 0; i < active_channels.length; ++i)
+    {
+        if (active_channels[i])
+            active_channel_bits |= 1 << i;
+    }
+    var input_threshold = document.getElementById("input_threshold_input").value;
+    var coincidence_window = document.getElementById("coincidence_window_input").value;
+    if (websocket)
+*/
+    clear_histogram();
+}
+
+function click_channel_button(index)
+{
+    active_channels[index] = !active_channels[index];
+    if (!active_channels[index])
+    {
+        var span = document.getElementById('counts_text_span' + index);
+        if (span)
+            span.innerHTML = '-';
+    }
+    send_channel_settings();
+}
+
+function click_filter_button(index)
+{
+    current_setup.single_filter_channels ^= (1 << index);
+    set_filter_buttons();
+    send_channel_settings();
+}
+
+function click_edge_inversion_button(index)
+{
+    current_setup.edge_inversion_channels ^= (1 << index);
+    set_edge_inversion_buttons();
+    send_channel_settings();
+}
+
+function set_filter_buttons(index)
+{
+    for (var chan = 0; chan < num_channels; ++chan)
+    {
+        var button = document.getElementById('filter_button_' + chan);
+        if (button)
+        {
+            var filtered = false;
+            if (current_setup.single_filter_channels & (1 << chan))
+                filtered = true;
+            if (!active_channels[chan])
+                filtered = true;
+            if (filtered)
+            {
+                button.style.backgroundColor = '#efe';
+                button.value = 'FILTERED';
+                button.title="FILTERED means only detect coincidences.\nThis reduces the chance that high levels of single-counts will overload the Waterloo box."
+            }
+            else
+            {
+                button.style.backgroundColor = '#fec';
+                button.value = 'NOT FILTERED';
+                button.title="NOT FILTERED means detect all single counts.\nThis may overload the Waterloo box if the count levels are high, which will disrupt other users as well."
+            }
+        }
+    }
+}
+
+function set_edge_inversion_buttons(index)
+{
+    for (var chan = 0; chan < num_channels; ++chan)
+    {
+        var button = document.getElementById('edge_inversion_button_' + chan);
+        if (button)
+        {
+            var inverted = false;
+            if (current_setup.edge_inversion_channels & (1 << chan))
+                inverted = true;
+            if (inverted)
+            {
+//                button.style.backgroundColor = '#efe';
+                button.value = 'FALLING EDGE';
+                button.title="FALLING EDGE means a pulse will be counted when he voltage drops below the specified threshold."
+            }
+            else
+            {
+//                button.style.backgroundColor = '#fec';
+                button.value = 'RISING EDGE';
+                button.title="RISING EDGE means a pulse will be counted when he voltage rises above the specified threshold."
+            }
+        }
+    }
+}
+
+
+var use_fake_data = false;
+function click_fake_data_button()
+{
+    var chk = document.getElementById("fake_data_check");
+    if (chk.checked)
+        use_fake_data = 1;
+    else
+        use_fake_data = 0;
+
+    if (websocket)
+        websocket.send('fake_data ' + use_fake_data);
+}
+
+var last_error_id = 0;
+function show_detector_error()
+{
+    var error_id = 0;
+    if (current_detector_data.error_id != null)
+    {
+        error_id = current_detector_data.error_id;
+        if (error_id != last_error_id)
+        {
+            last_error_id = error_id;
+            var str = '';
+            if (error_id)
+            {
+                str += '<font size="3" color="#a00">Error reported in counter: <b>';
+                if (current_detector_data.error_str)
+                    str += current_detector_data.error_str;
+                str += '</b></font>';
+                str += '<font size="2" color="#700">';
+                str += '<br/>';
+                if (error_id == 1 || (current_detector_data.error_str && current_detector_data.error_str.indexOf('DataOverflow') >= 0))
+                {
+                    str += '<b>From the manual:</b> An overflow in the 512 k values SRAM FIFO has been detected. The time-tag generation rate is higher than the USB transmission rate.';
+                    str += '<br/>';
+                    str += '<b>How to fix it:</b> Look for channels getting large numbers of counts. Either adjust the threshold voltages of those channels to reduce the counts, or else disconnect some inputs.';
+                    str += '<br/>';
+                }
+                str += '</font>';
+                str += '<br/>';
+            }
+            error_text_span.innerHTML = str;
+        }
+    }
+    else
+    {
+        error_text_span.innerHTML = '';
+    }
+}
+
+function handle_string(str)
+{
+    // TODO: There's a bad character at the end of the string when it comes in.
+    // This is a temporary hack to remove it.
+    str2 = str;
+    str = '';
+    for (var i = 0; i < str2.length - 1; ++i)
+        str += str2[i];
+
+    var incoming_data = JSON.parse(str);
+    if (incoming_data.type == 'setup')
+    {
+        current_setup = incoming_data;
+        console.log('received:');
+        console.log(str);
+        if (need_first_setup)
+            create_channel_area();
+        update_channel_area_from_current_setup();
+        if (need_first_setup)
+            send_channel_settings();
+        need_first_setup = false;
+        return;
+    }
+    else if (incoming_data.type == 'counts')
+    {
+        current_detector_data = incoming_data;
+        if (current_detector_data.time != null && uptime_status_span)
+        {
+            var uptime_str = 'Status: ';
+            var t = current_detector_data.time;
+            if (t < 5)
+                uptime_str += '<b>Starting...</b>';
+            else
+            {
+                var days = (0|(t / (60 * 60 * 24)));
+                var hours = (0|(t / (60 * 60))) % 24;
+                var minutes = (0|(t / (60))) % 60;
+                var seconds = (0|t) % 60;
+                uptime_str += '<b>Running.</b> Uptime: <b>' 
+                            + days    + '</b><font size="2" color="#aaa">d</font> <b>' 
+                            + hours   + '</b><font size="2" color="#aaa">h</font> <b>' 
+                            + minutes + '</b><font size="2" color="#aaa">m</font> <b>' 
+                            + seconds + '</b><font size="2" color="#aaa">s</font> ';
+            }
+            // Disable this warning for now, as it seems to be coming up more often than it should.
+            if (0 && current_detector_data.raw_counts == 0)
+            {
+                uptime_str += '<br/><font color="#a00">';
+                uptime_str += 'There are currently <b>no incoming counts</b> from the Waterloo box to the server.';
+                uptime_str += '</font>';
+            }
+            uptime_status_span.innerHTML = uptime_str;
+        }
+        var time_multiplier = 1;
+
+        var span_time_button = document.getElementById("cva_span_time");
+        var dt = current_detector_data.delta_time;
+        if (span_time_button && span_time_button.checked)
+            dt = current_detector_data.span_time;
+
+        var cps_button = document.getElementById("cva_abs");
+        if (cps_button && !cps_button.checked)
+            time_multiplier = 1.0 / dt;
+
+        if (current_detector_data.counts != null)
+        {
+            var count_total = 0;
+            for (var i = 0; i < current_detector_data.counts.length; ++i)
+            {
+                var span = document.getElementById('counts_text_span' + i);
+                if (active_channels[i])
+                {
+                    var count = current_detector_data.counts[i];
+                    count = 0|(count * time_multiplier);
+                    count_total += count;
+                    if (span)
+                        span.innerHTML = count;
+                }
+                var span = document.getElementById("counts_text_span_total");
+                if (span)
+                    span.innerHTML = '<b>'+count_total+'</b>';
+                }
+            draw_counts_graph();
+        }
+        if (current_detector_data.coincidence != null)
+        {
+            var count_total = 0;
+            for (var i = 0; i < current_detector_data.coincidence.length; ++i)
+            {
+                var span = document.getElementById("coincidence_text_span" + i);
+                if (span)
+                {
+                    var count = current_detector_data.coincidence[i];
+                    count = 0|(count * time_multiplier);
+                    span.innerHTML = count;
+                    count_total += count;
+                }
+            }
+            var span = document.getElementById("coincidence_text_span_total");
+            if (span)
+                span.innerHTML = '<b>'+count_total+'</b>';
+        }
+        if (current_detector_data.histogram_counts != null && current_detector_data.histogram_counts.length > 0)
+        {
+            draw_histogram();
+        }
+    }
+    show_detector_error();
+}
+
+function handle_binary(data)
+{
+    console.log('Got binary data');
+}
+
+function process_count_data(str)
+{
+
+}
+
+function make_rainbow(zero_to_one)
+{
+    var sval = Math.sin(zero_to_one * 2 * Math.PI);
+    var cval = Math.cos(zero_to_one * 2 * Math.PI);
+    var r = 255 * 0.5 * (sval + 1);
+    var g = 255 - r;
+    var b = 255 * 0.5 * (cval + 1);
+    return 'RGB('+r.toFixed(0)+', '+g.toFixed(0)+', '+b.toFixed(0)+')';
+}
+
+var count_canvas = document.getElementById("popout_count_canvas");
+var histogram_canvas = document.getElementById("popout_histogram_canvas");
+var channel_count_history_length = 100;
+var channel_count_history = [];
+var channel_delta_time_history = null;
+var next_hist = 0;
+var vertical_scale_max = 0;
+
+// These *may* be merged later with the display counterparts above, via a Recording class.
+// These are or recording/saving/exporting
+var recorded_channel_count_history_length = 0;
+var recorded_channel_count_history = [];
+var recorded_channel_delta_time_history = null;
+var recorded_next_hist = 0;
+var recorded_valid_length = 0;
+
+/*
+var all_recordings = [];
+function Recording()
+{
+    all_recordings.push(this);
+
+    var count_history_length = 0;
+    var count_history = [];
+    var delta_time_history = null;
+    var next_hist = 0;
+    var valid_length = 0;
+
+    this.setup_storage = function(new_length)
+    {
+        if (new_length > this.count_history_length)
+        {
+            this.valid_length = 0;
+            this.next_hist = 0;
+            this.count_history = [];
+            while (this.count_history.length < num_channels)
+            {
+                var index = this.count_history.length;
+                this.count_history.push(new Int32Array(new ArrayBuffer(4 * new_length)));
+                for (var i = 0; i < new_length; ++i)
+                    this.count_history[index][i] = 0;
+            }
+            this.delta_time_history = new Float32Array(new ArrayBuffer(4 * new_length));
+            for (var i = 0; i < new_length; ++i)
+                this.delta_time_history[i] = 1.0;
+        }
+        this.count_history_length = new_length;
+    }
+
+    this.update = function()
+    {
+        var old_valid_length = this.valid_length;
+        if (active_channels.length)
+        {
+            var num_active = 0;
+            for (var chan = 0; chan < active_channels.length; ++chan)
+            {
+                if (active_channels[chan])
+                {
+                    num_active++;
+                    this.count_history[chan][this.next_hist] = current_detector_data.counts[chan];
+                }
+                else
+                {
+                    this.count_history[chan][this.next_hist] = 0;
+                }
+            }
+            if (num_active > 0)
+            {
+                this.delta_time_history[this.next_hist] = current_detector_data.delta_time;
+                this.next_hist = (this.next_hist + 1) % this.count_history_length;
+                this.valid_length++;
+                if (this.valid_length > this.count_history_length)
+                    this.valid_length = this.count_history_length;
+            }
+        }
+        if (old_valid_length != this.valid_length)
+        {
+            var span = document.getElementById('length_actual_span');
+            var str = '' + this.valid_length + ' samples';
+            span.innerHTML = str;
+        }
+    }
+
+    this.clear = function()
+    {
+        this.valid_length = 0;
+        this.next_hist = 0;
+    }
+
+    this.make_text = function(separator)
+    {
+        var str = '';
+        if (!separator)
+            separator = '\t';
+        var slot = this.next_hist - this.valid_length;
+        slot = (slot + this.count_history_length) % this.count_history_length;
+        for (var i = 0; i < this.valid_length; ++i)
+        {
+            str += this.delta_time_history[slot];
+            for (var chan = 0; chan < active_channels.length; ++chan)
+            {
+                if (active_channels[chan])
+                {
+                    str += separator;
+                    str += this.count_history[chan][i];
+                }
+            }
+            slot = (slot + 1) % this.count_history_length;
+            str += '\n';
+        }
+        return str;
+    }
+
+    this.copy_to_clipboard = function()
+    {
+        var str = this.make_text('\t');
+        this.copy_text_to_clipboard(str);
+    }
+
+    this.save_csv = function()
+    {
+        var str = this.make_text(',');
+        window.open('data:text/csv;charset=utf-8,' + escape(str), 'count_data.csv');
+    }
+}
+
+var recording_coincidence = new Recording();
+*/
+
+function recording_length_changed()
+{
+    var input = document.getElementById('recording_length_input');
+    console.log('Setting history length to ' + input.value);
+    recording_setup_storage(input.value);
+}
+
+function recording_setup_storage(new_length)
+{
+    if (new_length > recorded_channel_count_history_length)
+    {
+        recorded_valid_length = 0;
+        recorded_next_hist = 0;
+        recorded_channel_count_history = [];
+        while (recorded_channel_count_history.length < num_channels)
+        {
+            var index = recorded_channel_count_history.length;
+            recorded_channel_count_history.push(new Int32Array(new ArrayBuffer(4 * new_length)));
+            for (var i = 0; i < new_length; ++i)
+                recorded_channel_count_history[index][i] = 0;
+        }
+        recorded_channel_delta_time_history = new Float32Array(new ArrayBuffer(4 * new_length));
+        for (var i = 0; i < new_length; ++i)
+            recorded_channel_delta_time_history[i] = 1.0;
+    }
+    recorded_channel_count_history_length = new_length;
+}
+
+function recording_update()
+{
+    var old_valid_length = recorded_valid_length;
+    if (active_channels.length)
+    {
+        var num_active = 0;
+        for (var chan = 0; chan < active_channels.length; ++chan)
+        {
+            if (active_channels[chan])
+            {
+                num_active++;
+                recorded_channel_count_history[chan][recorded_next_hist] = current_detector_data.counts[chan];
+            }
+            else
+            {
+                recorded_channel_count_history[chan][recorded_next_hist] = 0;
+            }
+        }
+        if (num_active > 0)
+        {
+            var span_time_button = document.getElementById("cva_span_time");
+            var dt = current_detector_data.delta_time;
+            if (span_time_button && span_time_button.checked)
+                dt = current_detector_data.span_time;
+            recorded_channel_delta_time_history[recorded_next_hist] = dt;
+            recorded_next_hist = (recorded_next_hist + 1) % recorded_channel_count_history_length;
+            recorded_valid_length++;
+            if (recorded_valid_length > recorded_channel_count_history_length)
+                recorded_valid_length = recorded_channel_count_history_length;
+        }
+    }
+    if (old_valid_length != recorded_valid_length)
+    {
+        var span = document.getElementById('recording_length_actual_span');
+        var str = '' + recorded_valid_length + ' samples';
+        span.innerHTML = str;
+    }
+}
+
+function recording_clear()
+{
+    recorded_valid_length = 0;
+    recorded_next_hist = 0;
+}
+
+function recording_make_text(separator)
+{
+    var str = '';
+    if (!separator)
+        separator = '\t';
+    var slot = recorded_next_hist - recorded_valid_length;
+    slot = (slot + recorded_channel_count_history_length) % recorded_channel_count_history_length;
+    for (var i = 0; i < recorded_valid_length; ++i)
+    {
+        str += recorded_channel_delta_time_history[slot];
+        for (var chan = 0; chan < active_channels.length; ++chan)
+        {
+            if (active_channels[chan])
+            {
+                str += separator;
+                str += recorded_channel_count_history[chan][i];
+            }
+        }
+        slot = (slot + 1) % recorded_channel_count_history_length;
+        str += '\n';
+    }
+    return str;
+}
+
+function recording_copy_to_clipboard()
+{
+    var str = recording_make_text('\t');
+    copy_text_to_clipboard(str);
+}
+
+function recording_save_csv()
+{
+    var str = recording_make_text(',');
+    window.open('data:text/csv;charset=utf-8,' + escape(str), 'count_data.csv');
+}
+
+function draw_counts_graph()
+{
+    recording_update();
+
+    var do_counts_per_second = false;
+    var cps_button = document.getElementById("cva_abs");
+    if (cps_button && !cps_button.checked)
+        do_counts_per_second = true;
+
+    while (channel_count_history.length < num_channels)
+    {
+        var index = channel_count_history.length;
+        channel_count_history.push(new Int32Array(new ArrayBuffer(4 * channel_count_history_length)));
+        for (var i = 0; i < channel_count_history_length; ++i)
+            channel_count_history[index][i] = 0;
+    }
+    if (!channel_delta_time_history)
+    {
+        channel_delta_time_history = new Float32Array(new ArrayBuffer(4 * channel_count_history_length));
+        for (var i = 0; i < channel_count_history_length; ++i)
+            channel_delta_time_history[i] = 1.0;
+    }
+
+    var span_time_button = document.getElementById("cva_span_time");
+    var dt = current_detector_data.delta_time;
+    if (span_time_button && span_time_button.checked)
+        dt = current_detector_data.span_time;
+
+    for (var chan = 0; chan < active_channels.length; ++chan)
+    {
+        if (active_channels[chan])
+        {
+            channel_count_history[chan][next_hist] = current_detector_data.counts[chan];
+            channel_delta_time_history[next_hist] = dt;
+        }
+    }
+    next_hist = (next_hist + 1) % channel_count_history_length;
+
+    var all_channels_max = 0;
+    var all_channels_max_dt = 1.0;
+    for (var chan = 0; chan < active_channels.length; ++chan)
+    {
+        if (active_channels[chan])
+        {
+            var counts = channel_count_history[chan];
+            for (var i = 0; i < channel_count_history_length; ++i)
+            {
+                var c = counts[i];
+                if (counts[i] > all_channels_max)
+                {
+                    all_channels_max = counts[i];
+                    all_channels_max_dt = channel_delta_time_history[i];
+                }
+            }
+        }
+    }
+
+    if (do_counts_per_second)
+        all_channels_max /= all_channels_max_dt;
+
+    vertical_scale_max = 0|all_channels_max;
+    if (vertical_scale_max < 1)
+        vertical_scale_max = 1;
+
+    var ctx = count_canvas.getContext('2d');
+    var w = count_canvas.width - (counts_left_margin + counts_margin);
+    var h = count_canvas.height - (counts_margin + counts_margin);
+
+    ctx.fillStyle = '#eee';
+    ctx.fillRect(0, 0, w, h);
+/*
+    ctx.globalAlpha = 1.0;
+    ctx.strokeStyle = "#f8f8f8";
+    ctx.beginPath();
+    ctx.moveTo(count_nextx, 0);
+    ctx.lineTo(count_nextx, h);
+    ctx.stroke();
+*/
+/*
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = "white";
+    ctx.beginPath();
+    ctx.moveTo(w * 0.9, 0);
+    ctx.lineTo(w * 0.9, h);
+    ctx.stroke();
+*/
+    draw_counts_frame(ctx);
+
+    for (var chan = 0; chan < active_channels.length; ++chan)
+    {
+        if (active_channels[chan])
+        {
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = make_rainbow(chan / num_channels);
+            ctx.beginPath();
+            for (var i = 0; i < channel_count_history_length; ++i)
+            {
+                index = (next_hist + i) % channel_count_history_length;
+                var x = counts_left_margin + w * i / channel_count_history_length;
+                var counts = channel_count_history[chan][index];
+                if (do_counts_per_second)
+                    counts /= channel_delta_time_history[index];
+                var y = (h + counts_margin) - counts * h / vertical_scale_max;
+                ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+        }
+    }
+}
+
+var counts_margin = 16;
+var counts_left_margin = 48;
+var histogram_accumulator = null;
+var histogram_margin = 16;
+var histogram_left_margin = 32;
+var num_histogram_slots = 320;
+var histogram_h_scale = 1;
+var hist_max = 1;
+function clear_histogram()
+{
+    if (histogram_accumulator)
+    {
+        var hist_length = current_detector_data.histogram_counts.length;
+        for (var i = 0; i < hist_length; ++i)
+            histogram_accumulator[i] = 0;
+    }
+}
+
+function copy_text_to_clipboard(str_to_copy)
+{
+    var box = document.getElementById("hidden_clipboard_transfer");
+    box.value = str_to_copy;
+    var old_focus = document.activeElement;
+    box.focus();
+    box.setSelectionRange(0, box.value.length);
+    var ok;
+    try {
+        ok = document.execCommand("copy");
+    } catch(e) {
+        ok = false;
+    }
+    // restore original focus
+    if (old_focus && typeof old_focus.focus === "function") {
+        old_focus.focus();
+    }
+}
+
+function copy_histogram()
+{
+    var str = '(no data)';
+    if (current_setup && current_detector_data)
+    {
+        str = '';
+        str += 'user:\t' + current_setup.user_name + '\n';
+        str += 'time:\t' + current_detector_data.local_time + '\n';
+        var reference_channel = -1;
+        var channel_columns = [];
+        for (var i = 0; i < num_channels && reference_channel < 0; ++i)
+        {
+            if (current_setup.histogram_channels & (1 << i))
+                reference_channel = i;
+        }
+        for (var i = 0; i < current_detector_data.histogram_counts.length; ++i)
+        {
+            if (current_detector_data.histogram_counts[i].length)
+                channel_columns.push(i);
+        }
+        if (channel_columns.length)
+        {
+            str += 'reference channel:\t' + (reference_channel + 1) + '\n';
+            str += 'offset (ns)';
+            for (var i = 0; i < channel_columns.length; ++i)
+                str += '\tch ' + (channel_columns[i] + 1);
+            str += '\n';
+
+            var num_rows = current_detector_data.histogram_counts[channel_columns[0]].length;
+            var start_ns = -0.5 * current_setup.histogram_windows_ns;
+            var ns_per_row = current_setup.histogram_windows_ns / (num_rows - 1);
+
+            for (var row = 0; row < num_rows; ++row)
+            {
+                str += '' + (start_ns + row * ns_per_row);
+                for (var col = 0; col < channel_columns.length; ++col)
+                {
+                    str += '\t' + histogram_accumulator[channel_columns[col]][row];
+                }
+                str += '\n';
+            }
+        }
+    }
+    copy_text_to_clipboard(str);
+}
+
+function server_box_changed()
+{
+    // Default values
+    if (!host_addr)
+        host_addr = 'det.phy.bris.ac.uk';
+    if (!host_port)
+        host_port = '8080';
+    var input = document.getElementById('server_address_input');
+    var part = input.value.split(':');
+    if (part && part.length == 2)
+    {
+        var new_host_addr = part[0];
+        var new_host_port = part[1];
+        if (new_host_addr != host_addr || new_host_port != host_port)
+        {
+            disconnect_websocket();
+            host_addr = new_host_addr;
+            host_port = new_host_port;
+        }
+    }
+    input.value = host_addr + ':' + host_port;
+}
+
+function toggle_server_box_lock()
+{
+    var input = document.getElementById('server_address_input');
+    var lock_icon = document.getElementById('server_address_lock');
+    input.disabled = !input.disabled;
+    if (input.disabled)
+        lock_icon.src = 'images/locked.png';
+    else
+        lock_icon.src = 'images/unlocked.png';
+}
+
+function draw_histogram()
+{
+    var ctx = histogram_canvas.getContext('2d');
+    var w = histogram_canvas.width;
+    var h = histogram_canvas.height;
+    draw_histogram_frame(ctx);
+
+    var num_hist_channels = current_detector_data.histogram_counts.length;
+    for (var channel = 0; channel < num_hist_channels; ++channel)
+    {
+        var hist_length = current_detector_data.histogram_counts[channel].length;
+        if (hist_length > 0)
+        {
+            num_histogram_slots = hist_length;
+            histogram_h_scale = (w - (histogram_margin + histogram_left_margin)) / hist_length;
+            if (!histogram_accumulator)
+                histogram_accumulator = new Array(num_channels);
+            if (!histogram_accumulator[channel] || histogram_accumulator[channel].length < hist_length)
+            {
+                histogram_accumulator[channel] = new Uint32Array(new ArrayBuffer(4 * hist_length));
+                for (var i = 0; i < hist_length; ++i)
+                    histogram_accumulator[channel][i] = 0;
+            }
+
+            var accum = histogram_accumulator[channel];
+            var incoming_counts = current_detector_data.histogram_counts[channel];
+            hist_max = 1;
+            for (var i = 0; i < hist_length; ++i)
+            {
+                accum[i] += incoming_counts[i];
+                if (hist_max < accum[i])
+                    hist_max = accum[i];
+            }
+        //    hist_max = Math.log(hist_max);
+
+            ctx.globalAlpha = 1.0;
+//            ctx.strokeStyle = "#00f";
+            ctx.strokeStyle = make_rainbow(channel / num_channels);
+            ctx.beginPath();
+            for (var i = 0; i < hist_length; ++i)
+            {
+                var x = histogram_left_margin + i * histogram_h_scale;
+                var y1 = h - histogram_margin - 1;
+                var vscale = (h - 2 * histogram_margin) / hist_max;
+                var val = accum[i];
+                var y2 = y1 - val * vscale;
+                ctx.lineTo(x, y2);
+            }
+            ctx.stroke();
+        }
+    }
+}
+
+function draw_histogram_frame(ctx)
+{
+    var w = histogram_canvas.width;
+    var h = histogram_canvas.height;
+    ctx.fillStyle = '#eee';
+    ctx.lineWidth = 1;
+    ctx.fillRect(0, 0, w, h);
+
+    // Draw the axes
+    ctx.strokeStyle = '#444';
+    ctx.beginPath();
+    ctx.moveTo(histogram_left_margin, histogram_margin);
+    ctx.lineTo(histogram_left_margin, h - histogram_margin);
+    ctx.lineTo(w - histogram_margin, h - histogram_margin);
+    ctx.stroke();
+
+    ctx.font = '9px sans-serif';
+    ctx.fillStyle = '#444';
+
+    // Draw the vert labels
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    var marks = 2;
+    var value_step = hist_max / (marks - 1);
+    var y_step = (h - (histogram_margin + histogram_margin)) / (marks - 1);
+    for (var i = 0; i < marks; ++i)
+    {
+        var x = histogram_left_margin - 2;
+        var y = h - histogram_margin - i * y_step;
+        ctx.fillText('' + (value_step * i), x, y);
+    }
+
+
+    // Draw the horiz labels
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    var x = histogram_left_margin + histogram_h_scale * num_histogram_slots * 0.5;
+    var y = 2 + h - histogram_margin;
+//    x = 50;
+//    y = 50;
+    ctx.fillText('0', x, y);
+    var pixels_per_ns = histogram_h_scale * num_histogram_slots / current_setup.histogram_windows_ns;
+    if (pixels_per_ns > 0)
+    {
+        var step = 10;
+        var ns = 0;
+        var done = false;
+        while (!done)
+        {
+            x -= step * pixels_per_ns;
+            ns -= step;
+            if (x >= histogram_left_margin)
+                ctx.fillText('' + ns, x, y);
+            else
+                done = true;
+        }
+        x = histogram_left_margin + histogram_h_scale * num_histogram_slots * 0.5;
+        ns = 0;
+        done = false;
+        while (!done)
+        {
+            x += step * pixels_per_ns;
+            ns += step;
+            if (x <= w - histogram_margin)
+                ctx.fillText('' + ns, x, y);
+            else
+                done = true;
+        }
+    }
+}
+
+
+function draw_counts_frame(ctx)
+{
+    var w = ctx.canvas.width;
+    var h = ctx.canvas.height;
+    ctx.fillStyle = '#eee';
+    ctx.lineWidth = 1;
+    ctx.fillRect(0, 0, w, h);
+
+    // Draw the axes
+    ctx.strokeStyle = '#444';
+    ctx.beginPath();
+    ctx.moveTo(counts_left_margin, counts_margin);
+    ctx.lineTo(counts_left_margin, h - counts_margin);
+    ctx.lineTo(w - counts_margin, h - counts_margin);
+    ctx.stroke();
+
+    ctx.font = '9px sans-serif';
+    ctx.fillStyle = '#444';
+
+    // Draw the vert labels
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    var marks = 2;
+    var value_step = vertical_scale_max / (marks - 1);
+    var y_step = (h - (counts_margin + counts_margin)) / (marks - 1);
+    for (var i = 0; i < marks; ++i)
+    {
+        var x = counts_left_margin - 2;
+        var y = h - counts_margin - i * y_step;
+        ctx.fillText('' + (value_step * i), x, y);
+    }
+}
+
+var all_popout_panels = [];
+new PopOutPanel('popout_count', 'Singles');
+new PopOutPanel('popout_histogram', 'Histogram');
+new PopOutPanel('popout_coincidence', 'Coincidence');
+
+// Given any Div, this makes it a draggable, sizeable pop-out panel
+function PopOutPanel(div_name, title)
+{
+    this.index = all_popout_panels.length;
+    all_popout_panels.push(this);
+    this.div_name = div_name;
+    this.title = title;
+    this.div = document.getElementById(div_name);
+    this.header_span = document.getElementById(div_name + '_header');
+    this.footer_span = document.getElementById(div_name + '_footer');
+    this.canvas = document.getElementById(div_name + '_canvas');
+    this.is_popped_out = false;
+    this.div.cqp_popout = this;
+
+    this.dragCanvasStartX = 0;
+    this.dragCanvasStartY = 0;
+    this.dragCanvasStartW = 0;
+    this.dragCanvasStartH = 0;
+    this.dragMouseStartX = 0;
+    this.dragMouseStartY = 0;
+    this.canvas_buffer_w = 0;
+    this.canvas_buffer_h = 0;
+
+    this.div.style.border = '1px solid #ddd';
+
+    this.make_header = function()
+    {
+        var str = '';
+        if (this.is_popped_out)
+            str += '<img src="images/pop_in.png" height="20" onclick="all_popout_panels[' + this.index + '].pop_in()"/>';
+        else
+            str += '<img src="images/pop_out.png" height="20" onclick="all_popout_panels[' + this.index + '].pop_out()"/>';
+        str += '<img src="images/clear.png" width="8" height="4" />';
+        str += '<font size="4"><b>' + this.title + '</b></font>';
+        str += '<br/>';
+        if (this.header_span)
+            this.header_span.innerHTML = str;
+    }
+
+    this.make_footer = function()
+    {
+        var str = '';
+
+//        if (this.is_popped_out)
+        {
+//            str += '<br/>';
+            str += '<div align="right" valign="bottom">';
+            str += '<img src="images/grow_box.png" height="20" id="grow_box_' + this.div_name + '"/>';
+            str += '</div>';
+        }
+
+        if (this.footer_span)
+            this.footer_span.innerHTML = str;
+    }
+
+    this.pop_out = function()
+    {
+        this.is_popped_out = true;
+        var div = this.div;
+        var rect = div.getBoundingClientRect();
+        var doc = document.documentElement;
+        var scroll_left = (window.pageXOffset || doc.scrollLeft) - (doc.clientLeft || 0);
+        var scroll_top = (window.pageYOffset || doc.scrollTop)  - (doc.clientTop || 0);
+        var x = rect.left + scroll_left;
+        var y = rect.top + scroll_top;
+        div.style.cssText = '';
+        div.style.margin = '0px auto';
+        div.style.position = 'absolute';
+        div.style.left = '' + x + 'px';
+        div.style.top = '' + y + 'px';
+        div.style.border = '1px solid #ddd';
+        div.style.zIndex = 2;
+        div.style.shadow = '0 0 30px 5px #999';
+        div.style.cssText += '-moz-box-shadow: 0 0 30px 5px #999; -webkit-box-shadow: 0 0 30px 5px #999;';
+        div.style.backgroundColor = 'white';
+        // These are important! They keep canvas-clicks from selecting text.
+//        div.onselectstart = function(e) { return false; };
+        div.onmousedown = function(e)
+            {
+                return this.cqp_popout.do_popout_mousedown(e);
+            };
+        this.make_header();
+        this.make_footer();
+    }
+
+    this.pop_in = function()
+    {
+        this.is_popped_out = false;
+        var div = this.div;
+        div.popout = this;
+        div.style.cssText = '';
+        div.style.margin = "0px auto";
+        div.style.position = 'static';
+        div.style.left = '0px';
+        div.style.top = '0px';
+        div.style.border = '1px solid #ddd';
+        div.style.zIndex = 2;
+        div.style.shadow = "0 0 30px 5px #999";
+        div.style.cssText += "-moz-box-shadow: unset; -webkit-box-shadow: unset;";
+        div.style.backgroundColor = 'white';
+
+        // These are important! They keep canvas-clicks from selecting text.
+//        div.onselectstart = null;
+//        div.onmousedown = null;
+        this.make_header();
+        this.make_footer();
+    }
+
+    this.get_mouse_pos = function(e)
+    {
+        if (e.offsetX)
+        {
+            this.mouseX = e.offsetX;
+            this.mouseY = e.offsetY;
+        }
+        else if (e.layerX)
+        {
+            this.mouseX = e.layerX;
+            this.mouseY = e.layerY;
+        }
+    }
+
+    this.do_popout_mousedown = function(e)
+    {
+        this.get_mouse_pos(e);
+
+        // Start canvas drag
+        this.dragMouseStartX = e.pageX;
+        this.dragMouseStartY = e.pageY;
+        this.dragCanvasStartX = parseInt(this.div.style.left);
+        this.dragCanvasStartY = parseInt(this.div.style.top);
+        var w = this.div.style.width;
+        var h = this.div.style.height;
+        if (!w)
+            w = this.div.clientWidth;
+        if (!h)
+            h = this.div.clientHeight;
+        this.dragCanvasStartW = parseInt(w);
+        this.dragCanvasStartH = parseInt(h);
+
+        if (this.canvas)
+        {
+            if (!this.canvas_buffer_w)
+                this.canvas_buffer_w = w - this.canvas.width;
+            if (!this.canvas_buffer_h)
+                this.canvas_buffer_h = h - this.canvas.height;
+        }
+
+        draggedPanel = this;
+        draggedFrameCount = 0;
+        var in_grow_box = false;
+        var grow_box_size = 20;
+        if (e.toElement.id.includes('grow_box'))
+            in_grow_box = true;
+        if (in_grow_box)
+            dragMode = 'resize';
+        else
+            dragMode = 'move';
+        return true;   // Keep us from selecting text while dragging!!
+    }
+
+    this.set_size = function(width, height)
+    {
+//        this.width = width;
+//        this.height = height;
+        if (this.canvas)
+        {
+            this.canvas.width = width;
+            this.canvas.height = height;
+        }
+        this.div.style.width = width + 'px';
+        this.div.style.height = height + 'px';
+        if (this.canvas)
+        {
+            this.canvas.width = width - this.canvas_buffer_w;
+            this.canvas.height = height - this.canvas_buffer_h;
+        }
+        this.div.overflow = "scroll";
+    }
+
+    this.set_pos = function(left, top)
+    {
+        this.div.style.left = left + 'px';
+        this.div.style.top = top + 'px';
+//        if (this.attach_div)
+//        {
+//            this.attach_div.style.left = (left + this.attach_div_offset.x) + 'px';
+//            this.attach_div.style.top = (top + this.attach_div_offset.y) + 'px';
+//        }
+    }
+
+    this.div.onmousedown = function(e)
+        {
+            return this.cqp_popout.do_popout_mousedown(e);
+        };
+    this.make_header();
+    this.make_footer();
+}
+
+var draggedPanel = null;
+var draggedFrameCount = 0;
+var dragMode = null;
+
+document.onmouseup = function(e)
+{
+    draggedPanel = null;
+    draggedFrameCount = 0;
+    dragMode = null;
+    return true;
+}
+
+document.onmousemove = function(e)
+{
+    var mx = e.pageX;
+    var my = e.pageY;
+    if (draggedPanel)
+    {
+//        if (draggedFrameCount == 0)
+//        {
+//            draggedPanel.bringToFront();
+//        }
+        draggedFrameCount++;
+        if (dragMode == 'move')
+        {
+            var x = draggedPanel.dragCanvasStartX + mx - draggedPanel.dragMouseStartX;
+            var y = draggedPanel.dragCanvasStartY + my - draggedPanel.dragMouseStartY;
+            if (x < 0) x = 0;
+            if (y < 0) y = 0;
+            draggedPanel.set_pos(x, y);
+        }
+        else if (dragMode == 'resize')
+        {
+            var x = draggedPanel.dragCanvasStartW + mx - draggedPanel.dragMouseStartX;
+            var y = draggedPanel.dragCanvasStartH + my - draggedPanel.dragMouseStartY;
+            if (x < 64) x = 64;
+            if (y < 64) y = 64;
+            draggedPanel.set_size(x, y);
+        }
+        return false;
+    }
+    return true;
+}
+
+    </script>
+
+</font>
+</body>
+</html>
+
+
+

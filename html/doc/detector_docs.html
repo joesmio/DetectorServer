@@ -1,0 +1,134 @@
+<html>
+<head>
+<title>Detector Server Documentation</title>
+
+  <!-- force browser re-load, so people don't have stale copies of this page -->
+  <meta http-equiv="cache-control" content="no-cache, must-revalidate, post-check=0, pre-check=0">
+  <meta http-equiv="expires" content="Sat, 31 Oct 2014 00:00:00 GMT">
+  <meta http-equiv="pragma" content="no-cache">
+
+  <script type="text/javascript" src="http://code.jquery.com/jquery-1.11.1.min.js"></script>
+</head>
+<body>
+
+<font face="Tahoma, Digital, Arial, Helvetica, sans-serif" size="3">
+<img src="../images/logo_top.png" height="100"/>
+<br/>
+
+<h2>Using the CQP Detector Server</h2>
+
+
+<p>
+The CQP Detector Server is a system which allows remote data collection from detectors to a variety of platforms.
+</p>
+
+<hr/>
+<h2>Terminology</h2>
+<ul>
+    <li>
+        <b>Server</b> - The C++ program running on a computer which is physically connected to the detectors.
+    </li><li>
+        <b>Listener</b> - The client-side data collector. Any number of Listeners may be connected to the Server, and each one may ask for different data.<br/>For example, if you're running an experiment on channels 1 and 2, you might use the detector web page (that's a listener) to view counts and coincidences, while also connecting a Python or Matlab listener to perform long-term data collection. From home, you may connect via a mobile phone (the web listener), to check that everything's up and running.
+    </li><li>
+        <b>Setup Data</b> - The data structure (in JSON format) used by the Listener to tell the Server who you are and what you want.
+    </li><li>
+        <b>Count Data</b> - The requested results (also in JSON format), sent from the Server to the Listener.
+    </li><li>
+        <b>Bitfield</b> (or <b>bit mask</b>) - A binary number where each bit is used as a binary flag (usually to indicate a detector channel on/off).
+    </li>
+</ul>
+
+<hr/>
+<h2>Data Structures</h2>
+All data structures are in human-readable JSON format. They're just text. 
+<h3>Setup Data</h3>
+Setup Data is used to communicate the current status of the server, and also let the listener make requests for data.<br/>Packed into a single line, it looks like this:
+<b><pre>    {"type":"setup","waterloo_data_mode":"timetag","poll_time":1.0,"user_name":"ej","user_platform":"python","timetag_unit_ok":1,"tick_resolution":0.000000,"active_channels":7,"input_threshold_volts":[-0.090000,-0.200000,-0.200000,-0.200000,-0.200000,-0.240000,-0.210000,-0.170000,-0.200000,-0.200000,-0.200000,-0.200000,-0.200000,-0.200000,-0.200000,-0.200000],"channel_delay_ns":[21.875000,0.000000,35.000000,0.000000,0.000000,0.000000,47.968750,0.000000,0.000000,0.000000,0.000000,0.000000,110.000000,100.000000,65.781250,21.718750],"coincidence_channels":[],"coincidence_windows_ns":[],"histogram_channels":0,"histogram_windows_ns":50.000000,"slide_co_all_mask":0,"slide_co_move_mask":0,"slide_co_width":0,"connected_users":["ej","stefano","jez_lab"],"connected_platforms":["python","web","web"],"connected_active_channels":[0,0,61440]}</pre></b>
+
+Here's an item-by-item rundown of what each field means:
+<i>
+<ul>
+<li><b>r:</b> The listener can read this value, but can't change it.</li>
+<li><b>w:</b> The listener provides this information to the server.</li>
+<li><b>r/w:</b> Both the listener and the server can change this.</li>
+</ul>
+</i>
+<b><pre>    {
+      "type":"setup",                                               (r:   Indicates that this is a "setup" packet)
+      "waterloo_data_mode":"timetag",                               (r:   The server-to-Waterloo USB mode)
+      "poll_time":1.0,                                              (w:   How often (in seconds) you want to receive count results. 0 means poll manually)
+      "user_name":"ej",                                             (w:   The listener's user name, as displayed to other users)
+      "user_platform":"python",                                     (w:   The listener's platform)
+      "timetag_unit_ok":1,                                          (r:   1 if the Waterloo box is on and connected to the server)
+      "tick_resolution":0.000000,                                   (r:   The maximum precision of the Waterloo box, in seconds)
+      "active_channels":7,                                          (r/w: Bit mask indicating the channels this listener will receive data from)
+      "input_threshold_volts":[-0.090000,-0.200000, ... -0.200000], (r/w: Waterloo voltage threshold for each channel)
+      "channel_delay_ns":[21.875000,0.000000, ... 21.718750],       (r/w: Waterloo delay for each channel, in nanoseconds)
+      "coincidence_channels":[],                                    (w:   For each requested coincidence count, a bit mask to indicate channels)
+      "coincidence_windows_ns":[],                                  (w:   For each requested coincidence count, a bit mask to indicate coincidence window in nanoseconds)
+      "histogram_channels":0,                                       (w:   For histogram, a bit mask to indicate channels)
+      "histogram_windows_ns":50.000000,                             (w:   For histogram, a bit mask to indicate histogram window in nanoseconds)
+      "slide_co_all_mask":0,                                        (w:   Slide-channel coindicence all-mask)
+      "slide_co_move_mask":0,                                       (w:   Slide-channel coindicence slide-mask)
+      "slide_co_width":0,                                           (w:   Slide-channel coindicence width, in time-bins)
+      "connected_users":["ej","stefano","jez_lab"],                 (r:   Who's connected now, including you)
+      "connected_platforms":["python","web","web"],                 (r:   What patform they're on)
+      "connected_active_channels":[0,0,61440]                       (r:   Which channels they're using (as bitmasks))
+    }</b></pre>
+
+<h3>Count Data</h3>
+Count Data is sent from the server to the listener, packed up like this:
+<b><pre>    {"type":"counts","waterloo_data_mode":"timetag","time":78441.457440,"delta_time":2.402956,"span_time":0.000000,"local_time":"10-11-16 09:16:48","raw_counts":0,"slide_co_counts":[],"coincidence":[],"histogram_counts":[],"counts":[54554,654,0,0,0,6546,0,0,0,0,0,778,0,0,0,0]}</pre></b>
+
+Here's an item-by-item rundown of what each field means:
+<b><pre>    {
+      "type":"counts",                                       (r: Indicates that this is a "counts" packet)
+      "waterloo_data_mode":"timetag",                        (r: The server-to-Waterloo USB mode)
+      "time":78441.457440,                                   (r: Time in seconds since the server was last restarted)
+      "delta_time":2.402956,                                 (r: Collection time in seconds for the counts in this packet)
+      "span_time":0.000000,                                  (r: Time between the first and last count in this packet)
+      "local_time":"10-11-16 09:16:48",                      (r: Local date and time)
+      "raw_counts":0,"slide_co_counts":[],                   (r: Slide-channel result data)
+      "coincidence":[],                                      (r: Coincidence result data)
+      "histogram_counts":[],                                 (r: Histogram result data)
+      "counts":[54554,654,0,0,0,6546,0,0,0,0,0,778,0,0,0,0]  (r: Single-channel counts)
+    }</b></pre>
+
+<hr/>
+<h2>Communicating With the Server</h2>
+Anything which communicates over a network connection can be a listener. Here's how it goes:
+<ol>
+    <li>
+        A listener connects to the server, and sends just one word:
+        <b><pre>setup</pre></b>
+    </li>
+    <li>
+        The server sends Setup Data to the listener:
+        <b><pre>{"type":"setup","waterloo_data_mode":"timetag","poll_time":1.0,"user_name":"(unknown user)","user_platform":"(unknown platform)","timetag_unit_ok":1,"tick_resolution":0.000000,"active_channels":0,"input_threshold_volts":[-0.090000,-0.200000,-0.200000,-0.200000,-0.200000,-0.240000,-0.210000,-0.170000,-0.200000,-0.200000,-0.200000,-0.200000,-0.200000,-0.200000,-0.200000,-0.200000],"channel_delay_ns":[21.875000,0.000000,35.000000,0.000000,0.000000,0.000000,47.968750,0.000000,0.000000,0.000000,0.000000,0.000000,110.000000,100.000000,65.781250,21.718750],"coincidence_channels":[],"coincidence_windows_ns":[],"histogram_channels":0,"histogram_windows_ns":50.000000,"slide_co_all_mask":0,"slide_co_move_mask":0,"slide_co_width":0,"connected_users":["(unknown user)","stefano","jez_lab"],"connected_platforms":["(unknown platform)","web","web"],"connected_active_channels":[0,0,61440]}
+        </pre></b>
+    </li>
+    <li>
+        The listener fills in fields of the Setup Data to indicate who they are and which channels and counts they're interested in, and sends it back to the server.
+        <b><pre>{"type":"setup","waterloo_data_mode":"timetag","poll_time":1.0,"user_name":"ej","user_platform":"python","timetag_unit_ok":1,"tick_resolution":0.000000,"active_channels":7,"input_threshold_volts":[-0.090000,-0.200000,-0.200000,-0.200000,-0.200000,-0.240000,-0.210000,-0.170000,-0.200000,-0.200000,-0.200000,-0.200000,-0.200000,-0.200000,-0.200000,-0.200000],"channel_delay_ns":[21.875000,0.000000,35.000000,0.000000,0.000000,0.000000,47.968750,0.000000,0.000000,0.000000,0.000000,0.000000,110.000000,100.000000,65.781250,21.718750],"coincidence_channels":[],"coincidence_windows_ns":[],"histogram_channels":0,"histogram_windows_ns":50.000000,"slide_co_all_mask":0,"slide_co_move_mask":0,"slide_co_width":0,"connected_users":["(unknown user)","stefano","jez_lab"],"connected_platforms":["(unknown platform)","web","web"],"connected_active_channels":[0,0,61440]}
+        </pre></b>
+    </li>
+    <li>
+        The server will echo back the Setup Data <b>to all connected listeners</b>, and then begin sending Count Data at the frequency requested by "poll_time". (See above for info details on the data format)<br/>
+        <i><b>Note:</b> If poll_time is set to zero, then the server will only send results each time the listener sends the word "counts".</i>
+        <b><pre>{"type":"counts","waterloo_data_mode":"timetag","time":78441.457440,"delta_time":2.402956,"span_time":0.000000,"local_time":"10-11-16 09:16:48","raw_counts":0,"slide_co_counts":[],"coincidence":[],"histogram_counts":[],"counts":[54554,654,0,0,0,6546,0,0,0,0,0,778,0,0,0,0]}
+        </pre></b>
+    </li>
+    <li>
+        To change the requested data, the listener can send the Setup Data again at any time. If any other user transmits a Setup Data packet, the server will echo the result to all connected users.
+    </li>
+</ol>
+
+
+
+
+</font>
+</body>
+</html>
+
+
+

@@ -1,0 +1,14 @@
+dev/qkd_control_sketch/win_build/Debug/
+*.suo
+dev/photonics_code_sketch/Debug/
+*.sdf
+*.ini
+*.opensdf
+*.sublime-workspace
+dev/UQDevices/cqp/old/
+dev/UQDevices/CD/
+dev/UQDevices/CTimeTag/
+dev/UQDevices/samples/
+dev/cqp_device_server/old - delete me/
+run_cqp_detectotron
+win64/CQP Detector Server.VC.db

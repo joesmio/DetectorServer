@@ -1,0 +1,622 @@
+<html>
+<head>
+<title>Detector Server</title>
+<script type="text/javascript" src="http://code.jquery.com/jquery-1.11.1.min.js"></script>
+</head>
+<body>
+<font face="Tahoma, Digital, Arial, Helvetica, sans-serif" size="3">
+<img src="images/logo_top.png" height="100"/>
+<br/>
+
+<h2>Remote device interface-o-tron</h2>
+version 0.001
+
+<table>
+    <tr>
+        <td colspan="2">
+            <hr/>
+        </td>
+    </tr>
+    <tr>
+        <td valign="top">
+<h3>Device 1: Detector Server</h3>
+<a href="detector.html"><b>(click here)</b></a>
+<br/>
+<br/>
+        </td>
+    </tr>
+    <tr>
+        <td colspan="2">
+            <hr/>
+        </td>
+    </tr>
+    <tr>
+        <td valign="top">
+<h3>Device 2: Optical Switch</h3>
+<select id="polatis_device_select"  onchange="set_polatis_device();">
+    <option value="polatis72" selected="">Polatis 72-port</option>
+    <option value="polatis384">Polatis 384-port</option>
+</select>
+<br/>
+
+<input id="input1.1" type="text" value="" size="30" placeholder="enter commands here" onkeydown = "if (event.keyCode == 13) send_command_in_box('polatis', 'input1.1', 'output1.1');">
+<br/>
+<font size="2">
+    Click <a href="manuals/PROD_C_101_13_0_Polatis_SCPI_Operations_Guide_May_2013.pdf" target="_blank">here</a> to read the manual
+<br/>
+<br/>
+<b>some common commands:</b>
+<br/>
+<input type="button" value="*idn?" onclick="send_command('polatis', '*idn?', 'output1.1');"/> - (Device info)
+<br/>
+<input type="button" value=":syst:comm:netw:addr?" onclick="send_command('polatis', ':syst:comm:netw:addr?', 'output1.1');"/> - (IP addr info)
+<br/>
+<input type="button" value=":oxc:swit:size?" onclick="send_command('polatis', ':oxc:swit:size?', 'output1.1');"/> - (Switch size)
+<br/>
+<input type="button" value=":oxc:swit:port:stat?" onclick="send_command('polatis', ':oxc:swit:port:stat?', 'output1.1');"/> - (Port status)
+<br/>
+<input type="button" value=":oxc:swit:conn:stat?" onclick="send_command('polatis', ':oxc:swit:conn:stat?', 'output1.1');"/> - (List connected ports)
+<br/>
+<input type="button" value=":oxc:swit:conn:add (@1),(@37)" onclick="send_command('polatis', ':oxc:swit:conn:add (@1),(@37)', 'output1.1'); get_polatis_stat();"/> - (Connect ports)
+<br/>
+<input type="button" value=":oxc:swit:conn:sub (@1),(@37)" onclick="send_command('polatis', ':oxc:swit:conn:sub (@1),(@37)', 'output1.1'); get_polatis_stat();"/> - (Disconnect ports)
+<br/>
+<input type="button" value=":oxc:swit:disc:all" onclick="send_command('polatis', ':oxc:swit:disc:all', 'output1.1'); get_polatis_stat();"/> - (Disconnect all)
+<br/>
+<input type="button" value=":syst:err?" onclick="send_command('polatis', ':syst:err?', 'output1.1');"/> - (Check for errors)
+<br/>
+</font>
+<textarea id="output1.1" display="none" rows="20" cols="40"></textarea>
+
+        </td>
+        <td valign="top">
+            <br/>
+            <span id="faceplate_span">
+            </span>
+            <br/>
+            <br/>
+
+<hr/>
+<input type="button" value=">" onclick="toggle_div('controls1.1');"/>
+(This is under construction)
+<br/>
+<div id="controls1.1">
+<span id="all_devices_span"></span>
+</div>
+<hr/>
+
+
+        </td>
+    </tr>
+
+
+
+
+    <tr>
+        <td colspan="2">
+            <hr/>
+        </td>
+    </tr>
+    <tr>
+        <td>
+<h3>Device 3: Andy's Chip</h3>
+        </td>
+        <td>
+            <br/>
+            <input type="button" value="Restart" onclick="" />
+            <input type="button" value="Flash FPGA" onclick="" />
+            <input type="button" value="Do QKD" onclick="" />
+        </td>
+    </tr>
+
+
+
+
+    <tr>
+        <td colspan="2">
+            <hr/>
+        </td>
+    </tr>
+    <tr>
+        <td>
+<h3>Device 3: Dave's QKD Receiver</h3>
+        </td>
+    </tr>
+
+
+
+    <tr>
+        <td colspan="2">
+            <hr/>
+        </td>
+    </tr>
+
+</table>
+
+<div id="received_response" style="display:none;"></div>
+
+<div id="connect_menu_div" style="display:none;"><span id="connect_menu_span">test</span></div>
+
+<script type="text/javascript" src="config/config.js"></script>
+
+<script type="text/javascript">
+
+var current_connections = null;
+
+function get_polatis_stat()
+{
+    send_command('polatis', ':oxc:swit:conn:stat?', 'output1.1', true);
+}
+
+function set_polatis_device()
+{
+    var num_connections = 2;
+    var span = document.getElementById('faceplate_span');
+    var selector = document.getElementById('polatis_device_select');
+    var value = selector.options[selector.selectedIndex].value;
+    var str = '';
+    str += '<center>';
+//    console.log(value);
+    if (value == 'polatis72')
+    {
+        num_connections = 72;
+        str += '<img src="images/polatis72_1280.jpg" width="600" style="border-style: solid; border-color: #aaa #ddd #ddd #aaa;"/>';
+    }
+    else if (value == 'polatis384')
+    {
+        num_connections = 384;
+        str += '<img src="images/polatis384_1280.jpg" width="600" style="border-style: solid; border-color: #aaa #ddd #ddd #aaa;"/>';
+    }
+    str += '</center>';
+
+    span.innerHTML = str;
+
+    current_connections = new Array(num_connections);
+    for (var i = 0; i < current_connections.length; ++i)
+        current_connections[i] = 0;
+
+}
+
+function parse_polatis_status(input_str)
+{
+    for (var i = 0; i < current_connections.length; ++i)
+        current_connections[i] = 0;
+    var strs1 = input_str.split(/[()]+/);
+    if (strs1.length >= 4 && strs1[2] == ',' && strs1[1].startsWith('@') && strs1[3].startsWith('@'))
+    {
+        var strs2a = strs1[1].split(/[@,]+/);
+        var strs2b = strs1[3].split(/[@,]+/);
+        if (strs2a.length == strs2b.length)
+        {
+            for (var i = 1; i < strs2a.length; ++i)
+            {
+                var a = parseInt(strs2a[i]);
+                var b = parseInt(strs2b[i]);
+                if (a && b)
+                {
+                    current_connections[a] = b;
+                    current_connections[b] = a;
+                }
+            }
+        }
+    }
+    setup_config();
+}
+
+function initialize_config_data()
+{
+    for (var project_index = 0; project_index < config.clients.length; ++project_index)
+    {
+        var project = config.clients[project_index];
+        for (var dev_index = 0; dev_index < project.inputs.length; ++dev_index)
+        {
+            var dev = project.inputs[dev_index];
+            dev.project = project;
+        }
+        for (var dev_index = 0; dev_index < project.outputs.length; ++dev_index)
+        {
+            var dev = project.outputs[dev_index];
+            dev.project = project;
+        }
+    }
+}
+
+function get_device_from_port(port)
+{
+    for (var dev_index = 0; dev_index < config.devices_src.length; ++dev_index)
+    {
+        var dev = config.devices_src[dev_index];
+        if (dev.port == port)
+            return dev;
+    }
+    for (var dev_index = 0; dev_index < config.devices_dest.length; ++dev_index)
+    {
+        var dev = config.devices_dest[dev_index];
+        if (dev.port == port)
+            return dev;
+    }
+    for (var project_index = 0; project_index < config.clients.length; ++project_index)
+    {
+        var project = config.clients[project_index];
+        for (var dev_index = 0; dev_index < project.inputs.length; ++dev_index)
+        {
+            var dev = project.inputs[dev_index];
+            dev.project = project;  // TODO: clean this up.
+            if (dev.port == port)
+                return dev;
+        }
+        for (var dev_index = 0; dev_index < project.outputs.length; ++dev_index)
+        {
+            var dev = project.outputs[dev_index];
+            dev.project = project;  // TODO: clean this up.
+            if (dev.port == port)
+                return dev;
+        }
+    }
+    return null;
+}
+
+function setup_config()
+{
+    var span_name = 'all_devices_span';
+    var span = document.getElementById(span_name);
+    console.log('src devices: ' + config.devices_src.length);
+    console.log('dest devices: ' + config.devices_dest.length);
+    console.log('clients: ' + config.clients.length);
+
+    var icon_width = 48;
+    var arrow_width = 24;
+
+    var str = '';
+
+    str += '<table>';
+    str += '<tr>';
+    str += '<td>';
+
+    str += '<table>';
+    for (var dev_index = 0; dev_index < config.devices_src.length; ++dev_index)
+    {
+        var dev = config.devices_src[dev_index];
+
+        var arrow_img = 'icons/not_connected.png';
+        if (current_connections[dev.port])
+            arrow_img = 'icons/arrow_green_right.png';
+        str += '<tr><td>';
+        str += '<img src="' + dev.icon + '" width="' + icon_width + '"/>';
+        str += '</td><td>';
+        str += 'Source: ' + dev.name;
+        str += '</td><td valign="center" style="font-size: 24pt; font-weight: normal; border-width: 1px; border-style: solid; border-color: #aaa #aaa #aaa #aaa;">';
+        str += '' + dev.port;
+        str += '<img src="' + arrow_img + '" width="' + arrow_width + '"/>';
+        if (current_connections[dev.port])
+            str += '' + current_connections[dev.port];
+        str += '</td><td>';
+        if (current_connections[dev.port])
+        {
+            var dev2 = get_device_from_port(current_connections[dev.port]);
+            if (dev2)
+            {
+                str += '<img src="' + dev2.icon + '" width="' + icon_width + '"/>';
+                str += '</td><td>';
+                if (dev2.project)
+                    str += dev2.project.owner;
+                else
+                    str += dev2.name;
+            }
+        }
+        str += '</td></tr>';
+    }
+    str += '</table>';
+
+    str += '</td><td>';
+
+    str += '<table>';
+
+    for (var dev_index = 0; dev_index < config.devices_dest.length; ++dev_index)
+    {
+        var dev = config.devices_dest[dev_index];
+
+        var arrow_img = 'icons/not_connected.png';
+        if (current_connections[dev.port])
+            arrow_img = 'icons/arrow_green_left.png';
+        str += '<tr><td>';
+        str += '<img src="' + dev.icon + '" width="' + icon_width + '"/>';
+        str += '</td><td>';
+        str += 'Sink: ' + dev.name;
+        str += '</td><td valign="center" style="font-size: 24pt; font-weight: normal; border-width: 1px; border-style: solid; border-color: #aaa #aaa #aaa #aaa;">';
+        str += '' + dev.port;
+        str += '<img src="' + arrow_img + '" width="' + arrow_width + '"/>';
+        if (current_connections[dev.port])
+            str += '' + current_connections[dev.port];
+        str += '</td><td>';
+        if (current_connections[dev.port])
+        {
+            var dev2 = get_device_from_port(current_connections[dev.port]);
+            if (dev2)
+            {
+                str += '<img src="' + dev2.icon + '" width="' + icon_width + '"/>';
+                str += '</td><td>';
+                if (dev2.project)
+                    str += dev2.project.owner;
+                else
+                    str += dev2.name;
+            }
+        }
+        str += '</td></tr>';
+    }
+    str += '</table>';
+
+    str += '</td>';
+    str += '</tr>';
+    str += '</table>';
+
+    str += '<br/>';
+
+    str += '<table>';
+    for (var project_index = 0; project_index < config.clients.length; ++project_index)
+    {
+        var project = config.clients[project_index];
+        str += '<tr><td colspan="3">';
+        str += '<b>';
+        str += 'Project: ' + project.name;
+        str += '<br/>';
+        str += 'Owner: ' + project.owner;
+        str += '<b>';
+        str += '</td></tr>';
+
+        for (var dev_index = 0; dev_index < project.inputs.length; ++dev_index)
+        {
+            var dev = project.inputs[dev_index];
+
+            var arrow_img = 'icons/not_connected.png';
+            if (current_connections[dev.port])
+                arrow_img = 'icons/arrow_green_left.png';
+            str += '<tr><td>';
+            str += '<img src="' + dev.icon + '" width="' + icon_width + '"/>';
+            str += '</td><td>';
+            str += 'Input: ' + dev.name;
+            str += '</td><td valign="center" style="font-size: 24pt; font-weight: normal; border-width: 1px; border-style: solid; border-color: #aaa #aaa #aaa #aaa;">';
+            str += '' + dev.port;
+            str += '<img src="' + arrow_img + '" width="' + arrow_width + '"/>';
+            if (current_connections[dev.port])
+                str += '' + current_connections[dev.port];
+            str += '</td><td>';
+            if (current_connections[dev.port])
+            {
+                var dev2 = get_device_from_port(current_connections[dev.port]);
+                if (dev2)
+                {
+                    str += '<img src="' + dev2.icon + '" width="' + icon_width + '"/>';
+                    str += '</td><td>';
+                    if (dev2.project)
+                        str += dev2.project.owner;
+                    else
+                        str += dev2.name;
+                }
+            }
+            str += '</td></tr>';
+        }
+        for (var dev_index = 0; dev_index < project.outputs.length; ++dev_index)
+        {
+            var dev = project.outputs[dev_index];
+
+            var arrow_img = 'icons/not_connected.png';
+            if (current_connections[dev.port])
+                arrow_img = 'icons/arrow_green_right.png';
+            str += '<tr><td>';
+            str += '<img src="' + dev.icon + '" width="' + icon_width + '"/>';
+            str += '</td><td>';
+            str += 'Output: ' + dev.name;
+            str += '</td><td valign="center" style="font-size: 24pt; font-weight: normal; border-width: 1px; border-style: solid; border-color: #aaa #aaa #aaa #aaa;">';
+            str += '' + dev.port;
+            str += '<img src="' + arrow_img + '" width="' + arrow_width + '"/>';
+            if (current_connections[dev.port])
+                str += '' + current_connections[dev.port];
+            str += '</td><td>';
+            if (current_connections[dev.port])
+            {
+                var dev2 = get_device_from_port(current_connections[dev.port]);
+                if (dev2)
+                {
+                    str += '<img src="' + dev2.icon + '" width="' + icon_width + '"/>';
+                    str += '</td><td>';
+                    if (dev2.project)
+                        str += dev2.project.owner;
+                    else
+                        str += dev2.name;
+                }
+            }
+            str += '</td></tr>';
+        }
+    }
+    str += '</table>';
+    str += '<br/>';
+
+    span.innerHTML = str;
+}
+
+function send_command_in_box(command_type, command_box, response_box)
+{
+    var box = document.getElementById(command_box);
+    send_command(command_type, box.value, response_box);
+}
+
+function send_command(command_type, command_to_send, response_box, no_local_echo)
+{
+//  return;
+//  var request_str = 'test';
+//    console.log('sending command ' + command_to_send);
+    var encoded_command_to_send = encodeURIComponent(command_to_send);
+//    console.log('sending command ' + command_to_send);
+    var request_str = 'command?type=' + command_type + '&cmd="' + encoded_command_to_send + '"&random=' + Math.random();
+//    console.log('sending command ' + request_str);
+//    return;
+
+    var out_box = document.getElementById(response_box);
+    if (!no_local_echo)
+    {
+        out_box.innerHTML += command_to_send + '\n';
+        out_box.scrollTop = out_box.scrollHeight; // auto-scroll
+    }
+
+    $( '#received_response' ).load( request_str, function( response, status, xhr ) {
+        if ( status == "error" )
+        {
+          console.log('Error sending command: ' + request_str +
+                      ': ' + xhr.status + ' ' + xhr.statusText);
+        }
+        else
+        {
+            var received_text = document.getElementById('received_response').innerHTML;
+            out_box.innerHTML += received_text;
+            out_box.scrollTop = out_box.scrollHeight; // auto-scroll
+            if (command_type == 'polatis' && command_to_send == ':oxc:swit:conn:stat?')
+                parse_polatis_status(received_text);
+//            console.log('received response ' + received_text);
+        }
+      });
+}
+
+function toggle_div(div_name)
+{
+  var div = document.getElementById(div_name);
+  if (div)
+  {
+    if (div.style.display == 'none')
+      div.style.display = 'block';
+    else
+      div.style.display = 'none';
+  }
+}
+
+function make_device_tile(device_number)
+{
+    var arrow_width = 36;
+    var icon_width = 36;
+    var icon_img = 'icons/clear.png';
+    var dev = get_device_from_port(device_number);
+    var str = '';
+
+    if (dev)
+        icon_img = dev.icon;
+    str += '<td>';
+    str += '<img src="' + icon_img + '" width="' + icon_width + '"/>';
+    str += '</td>';
+
+    str += '<td valign="center" style="font-size: 18pt; font-weight: normal; border-width: 1px; border-style: solid; border-color: #aaa #aaa #aaa #aaa;">';
+    str += '' + device_number;
+    str += '</td>';
+    str += '<td>';
+    if (dev)
+    {
+        if (dev.project)
+        {
+            str += dev.project.name + ': <b>' + dev.name + '</b>';
+            str += '<br/>' + dev.project.owner;
+        }
+        else
+        {
+            str += dev.name;
+        }
+    }
+    str += '</td>';
+    return str;
+}
+
+function get_connection_options(port_number)
+{
+    // This is for the 72-port version:
+    var groups72 = [
+        {in:[ 1, 2, 3, 4, 5, 6, 7, 8, 9],out:[37,38,39,40,41,42,43,44,45]},
+        {in:[10,11,12,13,14,15,16,17,18],out:[46,47,48,49,50,51,52,53,54]},
+        {in:[19,20,21,22,23,24,25,26,27],out:[55,56,57,58,59,60,61,62,63]},
+        {in:[28,29,30,31,32,33,34,35,36],out:[64,65,66,67,68,69,70,71,72]}
+    ];
+    var groups = groups72;
+    for (var i = 0; i < groups.length; ++i)
+    {
+        var ins = groups[i].in;
+        var outs = groups[i].out;
+        if (ins[0] <= port_number && ins[ins.length - 1] >= port_number)
+            return outs;
+        if (outs[0] <= port_number && outs[outs.length - 1] >= port_number)
+            return ins;
+    }
+    return [];
+}
+
+function show_connection_menu(port_number)
+{
+    var div = document.getElementById('connect_menu_div');
+    var span = document.getElementById('connect_menu_span');
+    if (div && span)
+    {
+        if (port_number < 0)
+        {
+            div.style.display = 'none';
+            return;
+        }
+        // build the menu
+        var icon_width = 36;
+
+        var str = '';
+        str += '<table>';
+        str += '<tr><td>';
+        var icon_img = 'icons/not_connected.png';
+        str += '<img src="' + icon_img + '" width="' + icon_width + '"/>';
+        str += '</td><td colspan="2" valign="center" style="font-size: 14pt; font-weight: normal;">';
+        str += 'Disconnect';
+        str += '</td></tr>';
+
+        var group = get_connection_options(port_number);
+        for (var i = 0; i < group.length; ++i)
+        {
+            str += '<tr>';
+            str += make_device_tile(group[i]);
+            str += '</tr>';
+        }
+
+        str += '<table>';
+
+        span.innerHTML = str;
+        div.style.position = 'absolute';
+        div.style.border = '1px solid black';
+        div.style.backgroundColor = 'white';
+        div.style.shadow = "0 0 30px 5px #999";
+        div.style.cssText += "-moz-box-shadow: 0 0 30px 5px #999; -webkit-box-shadow: 0 0 30px 5px #999;";
+        div.style.zIndex = 2;
+        div.style.left = 500;
+        div.style.top = 500;
+    }
+}
+
+document.onmousedown = function()
+{
+    show_connection_menu(-1);
+}
+// Temporary sample connections
+//current_connections[1] = 42;
+//current_connections[42] = 1;
+//current_connections[24] = 55;
+//current_connections[55] = 24;
+//current_connections[56] = 25;
+//current_connections[25] = 56;
+
+initialize_config_data();
+set_polatis_device();
+get_polatis_stat();
+//setup_config();
+//get_polatis_stat();
+show_connection_menu(1);
+
+
+</script>
+
+</font>
+
+
+
+
+</body>
+</html>
+
